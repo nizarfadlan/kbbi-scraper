@@ -7,6 +7,15 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+var schema = `
+CREATE TABLE lema (
+	id int auto_increment primary key,
+	kata varchar(100) not null,
+	lema varchar(100) not null,
+	kelas_kata varchar(100),
+	arti_kata text
+);`
+
 type Lema struct {
 	Id         int    `db:"id"`
 	Kata       string `db:"kata"`
@@ -22,6 +31,8 @@ func ConnectDB() (*sqlx.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf(err.Error())
 	}
+
+	db.MustExec(schema)
 
 	err = db.Ping()
 	if err != nil {
@@ -39,7 +50,7 @@ func InsertLemas(db *sqlx.DB, lemas []Lema) error {
 	defer tx.Rollback()
 
 	stmt, err := tx.Preparex(`
-		INSERT INTO lema (kata, lema, kelas_kata, arti_kata)
+		INSERT INTO lema (kata, lema, kelas_kata, keterangan)
 		VALUES (?, ?, ?, ?)
 	`)
 	if err != nil {
