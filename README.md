@@ -9,10 +9,14 @@ Dalam penyimpanan data 1 kata bisa lebih dari 1 lema dan 1 lema bisa lebih dari 
 |---|----------|-------------|------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 |33 |alas cawan|alas cawan   |                                                      |lapik cangkir                                                                                          |
 |---|---       |---          |---                                                   |---                                                                                                    |
-|57 |ankilosis |an.ki.lo.sis |n[Nomina: kata benda] Dok[Kedokteran dan Fisiologi: -]|tergabungnya tulang-tulang atau bagian lain yang keras dan membentuk satu tulang atau bagian yang keras|
-|58 |ankilosis |an.ki.lo.sis |n[Nomina: kata benda] Dok[Kedokteran dan Fisiologi: -]|kekakuan sendi karena penyakit atau pembedahan                                                         |
-|59 |anihilasi |a.ni.hi.la.si|n[Nomina: kata benda]                                 |keadaan hancur atau musnah total                                                                       |
-|60 |anihilasi |a.ni.hi.la.si|n[Nomina: kata benda] Fis[Fisika: -]                  |kombinasi dari sebuah partikel dan antipartikel seperti elektron dan positron untuk menghasilkan energi|
+|93 |bagaimana |ba.gai.ma.na bentuk tidak baku: begimana, gimana|pron[Pronomina: kelas kata yang meliputi kata ganti, kata tunjuk, dan kata tanya]|kata tanya untuk menanyakan cara, perbuatan (lazimnya diikuti kata cara): -- caranya membeli buku dari luar negeri?|
+|94 |bagaimana |ba.gai.ma.na bentuk tidak baku: begimana, gimana|pron[Pronomina: kelas kata yang meliputi kata ganti, kata tunjuk, dan kata tanya]|kata tanya untuk menanyakan akibat suatu tindakan: -- kalau dia lari nanti?                            |
+|95 |bagaimana |ba.gai.ma.na bentuk tidak baku: begimana, gimana|pron[Pronomina: kelas kata yang meliputi kata ganti, kata tunjuk, dan kata tanya]|kata tanya untuk meminta pendapat dari kawan bicara (diikuti kata kalau): -- kalau kita pergi ke Puncak?|
+|96 |bagaimana |ba.gai.ma.na bentuk tidak baku: begimana, gimana|pron[Pronomina: kelas kata yang meliputi kata ganti, kata tunjuk, dan kata tanya]|kata tanya untuk menanyakan penilaian atas suatu gagasan: -- pendapatmu?                               |
+|---|---       |---          |---                                                   |---                                                                                                    |
+|1286|aku       |a.ku         |pron[Pronomina: kelas kata yang meliputi kata ganti, kata tunjuk, dan kata tanya]|kata ganti orang pertama yang berbicara atau yang menulis (dalam ragam akrab); diri sendiri; saya      |
+|1287|aku       |a.ku         |n[Nomina: kata benda] akr[akronim]                    |anggaran dan keuangan                                                                                  |
+|1288|aku       |A.ku         |n[Nomina: kata benda]                                 |Li'o                                                                                                   |
 |...|...       |...          |...                                                   |...                                                                                                    |
 
 
