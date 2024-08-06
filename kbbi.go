@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/proxy"
 )
 
 const KBBI_URL = "https://kbbi.kemdikbud.go.id/entri/"
@@ -29,9 +31,83 @@ type FakeBrowserHeadersResponse struct {
 	Result []map[string]string `json:"result"`
 }
 
+type ProxyPortResponse struct {
+	Proxies []ProxyData `json:"proxies"`
+}
+
+type ProxyData struct {
+	Proxy string `json:"proxy"`
+}
+
 func RandomHeader(headersList []map[string]string) map[string]string {
 	randomIndex := rand.Intn(len(headersList))
 	return headersList[randomIndex]
+}
+
+func GetProxiesList() []string {
+	proxyPortAPIEndpoint := "https://api.proxyscrape.com/v3/free-proxy-list/get?request=displayproxies&country=id&proxy_format=protocolipport&format=json&timeout=20000"
+
+	req, _ := http.NewRequest("GET", proxyPortAPIEndpoint, nil)
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err == nil && resp.StatusCode == 200 {
+		defer resp.Body.Close()
+
+		var proxyPortResponse ProxyPortResponse
+		json.NewDecoder(resp.Body).Decode(&proxyPortResponse)
+
+		var proxiesList []string
+		for _, proxy := range proxyPortResponse.Proxies {
+			proxiesList = append(proxiesList, proxy.Proxy)
+		}
+		return proxiesList
+	}
+
+	var emptySlice []string
+	return emptySlice
+}
+
+func formatAndValidateProxies(proxies []string) string {
+	var validProxies []string
+	for _, p := range proxies {
+		if validateProxy(p) {
+			validProxies = append(validProxies, p)
+		} else {
+			PrintError("Proxy %s is not working, skipping.\n", p)
+		}
+	}
+
+	if len(validProxies) == 0 {
+		return ""
+	}
+
+	randomIndex := rand.Intn(len(validProxies))
+	return validProxies[randomIndex]
+}
+
+func validateProxy(proxyURL string) bool {
+	proxyURLParsed, err := url.Parse(proxyURL)
+	if err != nil {
+		return false
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyURLParsed),
+		},
+	}
+
+	resp, err := client.Get("http://httpbin.org/ip")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	return resp.StatusCode == http.StatusOK
 }
 
 func GetHeadersList() []map[string]string {
@@ -113,9 +189,23 @@ func SearchWord(word string) ([]ResponseObj, error) {
 
 	checkScrape := os.Getenv("SCRAPE_OPS")
 	var headersList []map[string]string
+
 	if checkScrape != "" {
 		headersList = GetHeadersList()
 	}
+
+	proxiesList := GetProxiesList()
+	validProxies := formatAndValidateProxies(proxiesList)
+
+	if validProxies == "" {
+		return nil, fmt.Errorf("no valid proxies found.")
+	}
+
+	rp, errProxy := proxy.RoundRobinProxySwitcher(validProxies)
+	if errProxy != nil {
+		return nil, fmt.Errorf("failed creating proxy switcher: %w", errProxy)
+	}
+	c.SetProxyFunc(rp)
 
 	c.OnRequest(func(r *colly.Request) {
 		if checkScrape != "" {
