@@ -67,6 +67,7 @@ func SearchWord(word string) ([]ResponseObj, error) {
 	c := colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(1),
+		colly.UserAgent("MozziMozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"),
 	)
 
 	var globalErr error
