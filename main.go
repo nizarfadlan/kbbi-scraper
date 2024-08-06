@@ -60,7 +60,7 @@ func saveToDatabase(db *sqlx.DB, results []ResponseObj, searchedWord string) err
 	return InsertLemas(db, lemas)
 }
 
-func processBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, optionProxy string) {
+func processBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, optionProxy *string) {
 	total := len(words)
 	processed := 0
 	var wg sync.WaitGroup
@@ -165,7 +165,7 @@ func main() {
 	optionProxy := "residential"
 
 	start := time.Now()
-	processBatch(words, batchSize, concurrency, db, optionProxy)
+	processBatch(words, batchSize, concurrency, db, &optionProxy)
 	duration := time.Since(start)
 
 	PrintInfo("Total execution time: %v", duration)

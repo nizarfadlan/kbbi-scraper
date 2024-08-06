@@ -105,7 +105,7 @@ func parseArti(s *goquery.Selection) []Arti {
 	return artiList
 }
 
-func SearchWord(word string, typeProxy string) ([]ResponseObj, error) {
+func SearchWord(word string, optionProxy *string) ([]ResponseObj, error) {
 	var dataResponse []ResponseObj
 	var globalErr error
 
@@ -163,29 +163,32 @@ func SearchWord(word string, typeProxy string) ([]ResponseObj, error) {
 	})
 
 	urlKbbi := fmt.Sprintf("%s%s", KBBI_URL, word)
-	if typeProxy == "residential" {
-		proxyList := []string{
-			fmt.Sprintf("http://scrapeops:%s@residential-proxy.scrapeops.io:8181", keyScrape),
+	if optionProxy != nil {
+		typeProxy := *optionProxy
+		if typeProxy == "residential" {
+			proxyList := []string{
+				fmt.Sprintf("http://scrapeops:%s@residential-proxy.scrapeops.io:8181", keyScrape),
+			}
+
+			rp, err := proxy.RoundRobinProxySwitcher(proxyList...)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			c.SetProxyFunc(rp)
+		} else if typeProxy == "endpoint" {
+			u, errUrlParse := url.Parse("https://proxy.scrapeops.io/v1/")
+			if errUrlParse != nil {
+				return nil, fmt.Errorf("failed to parse url: %w", errUrlParse)
+			}
+
+			q := u.Query()
+			q.Set("api_key", keyScrape)
+			q.Set("url", urlKbbi)
+			u.RawQuery = q.Encode()
+
+			urlKbbi = u.String()
 		}
-
-		rp, err := proxy.RoundRobinProxySwitcher(proxyList...)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		c.SetProxyFunc(rp)
-	} else if typeProxy == "endpoint" {
-		u, errUrlParse := url.Parse("https://proxy.scrapeops.io/v1/")
-		if errUrlParse != nil {
-			return nil, fmt.Errorf("failed to parse url: %w", errUrlParse)
-		}
-
-		q := u.Query()
-		q.Set("api_key", keyScrape)
-		q.Set("url", urlKbbi)
-		u.RawQuery = q.Encode()
-
-		urlKbbi = u.String()
 	}
 
 	err := c.Visit(urlKbbi)
