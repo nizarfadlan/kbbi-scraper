@@ -10,6 +10,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
 )
 
 func LogError(message string, err error) {
@@ -146,6 +147,12 @@ func processBatch(words []string, batchSize int, concurrency int, db *sqlx.DB) {
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		PrintError("Error loading .env file")
+		return
+	}
+
 	filename := "word.txt"
 	words, err := readWordsFromFile(filename)
 	if err != nil {
@@ -160,7 +167,7 @@ func main() {
 		PrintError("Error connecting to database: %v", err)
 		return
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// startSingle := time.Now()
 	// for _, word := range words {

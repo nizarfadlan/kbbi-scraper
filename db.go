@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -13,7 +15,7 @@ CREATE TABLE lema (
 	kata varchar(100) not null,
 	lema varchar(100) not null,
 	kelas_kata varchar(100),
-	arti_kata text
+	keterangan text
 );`
 
 type Lema struct {
@@ -25,21 +27,41 @@ type Lema struct {
 }
 
 func ConnectDB() (*sqlx.DB, error) {
-	dsn := "root:nizar@(localhost:3306)/kbbi"
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	username := os.Getenv("DB_USERNAME")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
 
-	db, err := sqlx.Connect("mysql", dsn)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&charset=utf8mb4",
+		username, password, host, port, dbname)
+
+	db, err := sqlx.Open("mysql", dsn)
 	if err != nil {
 		return nil, fmt.Errorf(err.Error())
 	}
 
-	db.MustExec(schema)
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	err = db.Ping()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to ping the database: " + err.Error())
 	}
 
+	_, err = db.Exec(schema)
+	if err != nil {
+		return nil, fmt.Errorf("error creating schema: %w", err)
+	}
+
 	return db, nil
+}
+
+func CloseDB(db *sqlx.DB) {
+	if err := db.Close(); err != nil {
+		PrintError("Failed to close database: %v", err)
+	}
 }
 
 func InsertLemas(db *sqlx.DB, lemas []Lema) error {
