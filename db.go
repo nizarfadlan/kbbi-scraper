@@ -10,7 +10,7 @@ import (
 )
 
 var schema = `
-CREATE TABLE lema (
+CREATE TABLE IF NOT EXISTS lema (
 	id int auto_increment primary key,
 	kata varchar(100) not null,
 	lema varchar(100) not null,
