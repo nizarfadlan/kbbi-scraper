@@ -98,9 +98,5 @@ func ExistsLemaByKata(db *sqlx.DB, kata string) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM lema WHERE kata = ?)`
 	var exists bool
 	err := db.Get(&exists, query, kata)
-	if err != nil {
-		return false, err
-	}
-
-	return exists, nil
+	return exists, err
 }

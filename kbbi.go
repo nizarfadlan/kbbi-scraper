@@ -1,8 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/rand"
+	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
@@ -20,9 +25,45 @@ type ResponseObj struct {
 	Arti []Arti `json:"arti"`
 }
 
+type FakeBrowserHeadersResponse struct {
+	Result []map[string]string `json:"result"`
+}
+
+func RandomHeader(headersList []map[string]string) map[string]string {
+	randomIndex := rand.Intn(len(headersList))
+	return headersList[randomIndex]
+}
+
+func GetHeadersList() []map[string]string {
+	scrapeopsAPIKey := os.Getenv("SCRAPE_OPS")
+	scrapeopsAPIEndpoint := "http://headers.scrapeops.io/v1/browser-headers?api_key=" + scrapeopsAPIKey
+
+	req, _ := http.NewRequest("GET", scrapeopsAPIEndpoint, nil)
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err == nil && resp.StatusCode == 200 {
+		defer resp.Body.Close()
+
+		var fakeBrowserHeadersResponse FakeBrowserHeadersResponse
+		json.NewDecoder(resp.Body).Decode(&fakeBrowserHeadersResponse)
+		return fakeBrowserHeadersResponse.Result
+	}
+
+	var emptySlice []map[string]string
+	return emptySlice
+}
+
 func checkFrasaNotFound(e *goquery.Selection) bool {
 	html, _ := e.Find("h4:contains('tidak ditemukan')").Html()
 	return strings.Contains(html, "tidak ditemukan")
+}
+
+func checkBatasHarian(e *goquery.Selection) bool {
+	html, _ := e.Find("h1:contains('Batas Sehari')").Html()
+	return strings.Contains(html, "Batas Sehari")
 }
 
 func extractKataDasar(s *goquery.Selection) string {
@@ -67,12 +108,33 @@ func SearchWord(word string) ([]ResponseObj, error) {
 	c := colly.NewCollector(
 		colly.Async(true),
 		colly.MaxDepth(1),
-		colly.UserAgent("MozziMozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"),
+		colly.AllowURLRevisit(),
 	)
+
+	checkScrape := os.Getenv("SCRAPE_OPS")
+	var headersList []map[string]string
+	if checkScrape != "" {
+		headersList = GetHeadersList()
+	}
+
+	c.OnRequest(func(r *colly.Request) {
+		if checkScrape != "" {
+			randomHeader := RandomHeader(headersList)
+			for key, value := range randomHeader {
+				r.Headers.Set(key, value)
+			}
+		}
+	})
+
+	c.SetRequestTimeout(time.Second * 60)
 
 	var globalErr error
 	c.OnHTML(".body-content", func(e *colly.HTMLElement) {
 		e.DOM.Find("h4:contains('Pesan')").NextAll().Remove()
+		if checkBatasHarian(e.DOM) {
+			globalErr = fmt.Errorf("your search has reached the maximum limit in a day")
+			return
+		}
 		if checkFrasaNotFound(e.DOM) {
 			return
 		}

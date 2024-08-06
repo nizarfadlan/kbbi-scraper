@@ -60,27 +60,6 @@ func saveToDatabase(db *sqlx.DB, results []ResponseObj, searchedWord string) err
 	return InsertLemas(db, lemas)
 }
 
-func processSingle(word string, db *sqlx.DB) error {
-	PrintInfo("Processing '%s'", word)
-	results, err := SearchWord(word)
-	if err != nil {
-		return fmt.Errorf("error searching for '%s': %v", word, err)
-	}
-
-	if len(results) == 0 {
-		PrintInfo("No results found for '%s'", word)
-		return nil
-	}
-
-	errInsert := saveToDatabase(db, results, word)
-	if errInsert != nil {
-		return fmt.Errorf("error inserting '%s': %v", word, errInsert)
-	}
-
-	PrintSuccess("Successfully processed '%s'", word)
-	return nil
-}
-
 func processBatch(words []string, batchSize int, concurrency int, db *sqlx.DB) {
 	total := len(words)
 	processed := 0
@@ -101,17 +80,28 @@ func processBatch(words []string, batchSize int, concurrency int, db *sqlx.DB) {
 				semaphore <- struct{}{}
 				go func(word string) {
 					defer func() { <-semaphore }()
+
+					checkExist, errCheck := ExistsLemaByKata(db, word)
+					if errCheck != nil {
+						PrintError("An error occurred when checking in the database\n")
+						return
+					}
+
+					if checkExist {
+						PrintInfo("Word '%s' data in the database already exists\n", word)
+						return
+					}
 					PrintInfo("Processing '%s'", word)
 					results, err := SearchWord(word)
 					if err != nil {
-						message := fmt.Sprintf("Error searching for '%s'", word)
+						message := fmt.Sprintf("Error searching for '%s'\n", word)
 						PrintError("%s: %v", message, err)
 						LogError(message, err)
 						return
 					}
 
 					if len(results) == 0 {
-						message := fmt.Sprintf("No results found for '%s'", word)
+						message := fmt.Sprintf("No results found for '%s'\n", word)
 						PrintInfo(message)
 						LogError(message, nil)
 						return
@@ -119,18 +109,18 @@ func processBatch(words []string, batchSize int, concurrency int, db *sqlx.DB) {
 
 					errInsert := saveToDatabase(db, results, word)
 					if errInsert != nil {
-						message := fmt.Sprintf("Error inserting '%s'", word)
+						message := fmt.Sprintf("Error inserting '%s'\n", word)
 						PrintError("%s: %v", message, errInsert)
 						LogError(message, errInsert)
 						return
 					}
 
-					PrintSuccess("Successfully processed '%s'", word)
+					PrintSuccess("Successfully processed word '%s'", word)
 					for _, result := range results {
 						PrintSuccess("Lema: %s\n", result.Lema)
 						for _, arti := range result.Arti {
 							PrintSuccess("  Kelas Kata: %s\n", arti.KelasKata)
-							PrintSuccess("  Deskripsi: %s\n", arti.Keterangan)
+							PrintSuccess("  Keterangan: %s\n", arti.Keterangan)
 						}
 						fmt.Println()
 					}
@@ -168,17 +158,6 @@ func main() {
 		return
 	}
 	defer CloseDB(db)
-
-	// startSingle := time.Now()
-	// for _, word := range words {
-	// 	err := processSingle(word, db)
-	// 	if err != nil {
-	// 		PrintError("Error processing '%s': %v", word, err)
-	// 		LogError(fmt.Sprintf("Error processing '%s'", word), err)
-	// 	}
-	// }
-	// durationSingle := time.Since(startSingle)
-	// PrintInfo("Total execution time: %v", durationSingle)
 
 	batchSize := 100
 	concurrency := 10
