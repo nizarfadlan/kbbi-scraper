@@ -3,14 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/proxy"
 )
 
 const KBBI_URL = "https://kbbi.kemdikbud.go.id/entri/"
@@ -102,8 +105,9 @@ func parseArti(s *goquery.Selection) []Arti {
 	return artiList
 }
 
-func SearchWord(word string) ([]ResponseObj, error) {
+func SearchWord(word string, typeProxy string) ([]ResponseObj, error) {
 	var dataResponse []ResponseObj
+	var globalErr error
 
 	c := colly.NewCollector(
 		colly.Async(true),
@@ -111,15 +115,15 @@ func SearchWord(word string) ([]ResponseObj, error) {
 		colly.AllowURLRevisit(),
 	)
 
-	checkScrape := os.Getenv("SCRAPE_OPS")
+	keyScrape := os.Getenv("SCRAPE_OPS")
 	var headersList []map[string]string
 
-	if checkScrape != "" {
+	if keyScrape != "" {
 		headersList = GetHeadersList()
 	}
 
 	c.OnRequest(func(r *colly.Request) {
-		if checkScrape != "" {
+		if keyScrape != "" {
 			randomHeader := RandomHeader(headersList)
 			for key, value := range randomHeader {
 				r.Headers.Set(key, value)
@@ -129,11 +133,10 @@ func SearchWord(word string) ([]ResponseObj, error) {
 
 	c.SetRequestTimeout(time.Second * 40)
 
-	var globalErr error
 	c.OnHTML(".body-content", func(e *colly.HTMLElement) {
 		e.DOM.Find("h4:contains('Pesan')").NextAll().Remove()
 		if checkBatasHarian(e.DOM) {
-			globalErr = fmt.Errorf("your search has reached the maximum limit in a day")
+			globalErr = fmt.Errorf("limit reached")
 			return
 		}
 		if checkFrasaNotFound(e.DOM) {
@@ -159,7 +162,33 @@ func SearchWord(word string) ([]ResponseObj, error) {
 		globalErr = err
 	})
 
-	err := c.Visit(KBBI_URL + word)
+	urlKbbi := fmt.Sprintf("%s%s", KBBI_URL, word)
+	if typeProxy == "residential" {
+		proxyList := []string{
+			fmt.Sprintf("http://scrapeops:%s@residential-proxy.scrapeops.io:8181", keyScrape),
+		}
+
+		rp, err := proxy.RoundRobinProxySwitcher(proxyList...)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		c.SetProxyFunc(rp)
+	} else if typeProxy == "endpoint" {
+		u, errUrlParse := url.Parse("https://proxy.scrapeops.io/v1/")
+		if errUrlParse != nil {
+			return nil, fmt.Errorf("failed to parse url: %w", errUrlParse)
+		}
+
+		q := u.Query()
+		q.Set("api_key", keyScrape)
+		q.Set("url", urlKbbi)
+		u.RawQuery = q.Encode()
+
+		urlKbbi = u.String()
+	}
+
+	err := c.Visit(urlKbbi)
 	if err != nil {
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
@@ -167,6 +196,10 @@ func SearchWord(word string) ([]ResponseObj, error) {
 	c.Wait()
 
 	if globalErr != nil {
+		if globalErr.Error() == "limit reached" {
+			PrintError("your search has reached the maximum limit in a day")
+		}
+
 		return nil, fmt.Errorf("something went wrong: %w", globalErr)
 	}
 

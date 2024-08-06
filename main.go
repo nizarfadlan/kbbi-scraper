@@ -50,8 +50,8 @@ func saveToDatabase(db *sqlx.DB, results []ResponseObj, searchedWord string) err
 	for _, result := range results {
 		for _, arti := range result.Arti {
 			lemas = append(lemas, Lema{
-				Kata:       result.Lema,
-				Lema:       searchedWord,
+				Kata:       searchedWord,
+				Lema:       result.Lema,
 				KelasKata:  arti.KelasKata,
 				Keterangan: arti.Keterangan,
 			})
@@ -60,7 +60,7 @@ func saveToDatabase(db *sqlx.DB, results []ResponseObj, searchedWord string) err
 	return InsertLemas(db, lemas)
 }
 
-func processBatch(words []string, batchSize int, concurrency int, db *sqlx.DB) {
+func processBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, optionProxy string) {
 	total := len(words)
 	processed := 0
 	var wg sync.WaitGroup
@@ -91,8 +91,9 @@ func processBatch(words []string, batchSize int, concurrency int, db *sqlx.DB) {
 						PrintInfo("Word '%s' data in the database already exists\n", word)
 						return
 					}
+
 					PrintInfo("Processing '%s'", word)
-					results, err := SearchWord(word)
+					results, err := SearchWord(word, optionProxy)
 					if err != nil {
 						message := fmt.Sprintf("Error searching for '%s'\n", word)
 						PrintError("%s: %v", message, err)
@@ -161,9 +162,10 @@ func main() {
 
 	batchSize := 100
 	concurrency := 10
+	optionProxy := "residential"
 
 	start := time.Now()
-	processBatch(words, batchSize, concurrency, db)
+	processBatch(words, batchSize, concurrency, db, optionProxy)
 	duration := time.Since(start)
 
 	PrintInfo("Total execution time: %v", duration)

@@ -12,9 +12,9 @@ import (
 var schema = `
 CREATE TABLE IF NOT EXISTS lema (
 	id int auto_increment primary key,
-	kata varchar(100) not null,
-	lema varchar(100) not null,
-	kelas_kata varchar(100),
+	kata varchar(255) not null,
+	lema varchar(255) not null,
+	kelas_kata tinytext,
 	keterangan text
 );`
 
