@@ -1,9 +1,11 @@
-package main
+package database
 
 import (
 	"fmt"
 	"os"
 	"time"
+
+	"kbbi-scraper/internal/common"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -11,11 +13,16 @@ import (
 
 var schema = `
 CREATE TABLE IF NOT EXISTS lema (
-	id int auto_increment primary key,
-	kata varchar(255) not null,
-	lema varchar(255) not null,
-	kelas_kata tinytext,
-	keterangan text
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    kata VARCHAR(255) NOT NULL,
+    lema VARCHAR(255) NOT NULL,
+    kelas_kata TINYTEXT,
+    keterangan TEXT
+);
+
+CREATE TABLE IF NOT EXISTS words (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    kata VARCHAR(255) UNIQUE NOT NULL
 );`
 
 type Lema struct {
@@ -26,6 +33,11 @@ type Lema struct {
 	Keterangan string `db:"keterangan"`
 }
 
+type Kata struct {
+	Id   int    `db:"id"`
+	Kata string `db:"kata"`
+}
+
 func ConnectDB() (*sqlx.DB, error) {
 	host := os.Getenv("DB_HOST")
 	port := os.Getenv("DB_PORT")
@@ -33,7 +45,7 @@ func ConnectDB() (*sqlx.DB, error) {
 	password := os.Getenv("DB_PASSWORD")
 	dbname := os.Getenv("DB_NAME")
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&charset=utf8mb4",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&charset=utf8mb4&multiStatements=true",
 		username, password, host, port, dbname)
 
 	db, err := sqlx.Open("mysql", dsn)
@@ -60,7 +72,7 @@ func ConnectDB() (*sqlx.DB, error) {
 
 func CloseDB(db *sqlx.DB) {
 	if err := db.Close(); err != nil {
-		PrintError("Failed to close database: %v", err)
+		common.PrintError("Failed to close database: %v", err)
 	}
 }
 
@@ -99,4 +111,40 @@ func ExistsLemaByKata(db *sqlx.DB, kata string) (bool, error) {
 	var exists bool
 	err := db.Get(&exists, query, kata)
 	return exists, err
+}
+
+func InsertWords(db *sqlx.DB, words []string) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Preparex(`
+		INSERT INTO words (kata)
+		VALUES (?)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, word := range words {
+		_, err := stmt.Exec(word)
+		if err != nil {
+			return fmt.Errorf("failed to insert word %+v: %w", word, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+func GetWords(db *sqlx.DB) ([]Kata, error) {
+	var words []Kata
+	err := db.Select(&words, "SELECT * FROM words")
+	return words, err
 }

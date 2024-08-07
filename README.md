@@ -1,6 +1,12 @@
 # Scraper KBBI
 Scraper KBBI 5 pada website [kbbi.kemdikbud](https://kbbi.kemdikbud.go.id/) dengan jumlah daftar kata 112.651.
 
+# Run
+
+```bash
+go run ./cmd/cli
+```
+
 # Example data
 
 Dalam penyimpanan data 1 kata bisa lebih dari 1 lema dan 1 lema bisa lebih dari 1 arti (terdiri dari kelas kata dan keterangan). Ada juga kata yang tidak memiliki kelas kata.

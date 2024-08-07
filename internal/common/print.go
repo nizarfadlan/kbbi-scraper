@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"fmt"
@@ -71,4 +71,25 @@ func PrintCustom(format string, textColor color.Attribute, isBold bool, a ...int
 		printer = printer.Add(color.Bold)
 	}
 	printer.Printf(format+"\n", a...)
+}
+
+func DisplayMenu() {
+	PrintCustom("=== Menu Wordlist ===", color.FgHiMagenta, true)
+	PrintCustom("1. Find Wordlist", color.FgHiMagenta, true)
+	PrintCustom("2. Fetch Wordlist Contents", color.FgHiMagenta, true)
+	PrintCustom("3. Quit", color.FgHiMagenta, true)
+	fmt.Print("Choose an option (1-3): ")
+}
+
+func GetUserChoice() string {
+	var choice string
+	fmt.Scanln(&choice)
+	return strings.TrimSpace(choice)
+}
+
+func GetInput(message string) string {
+	fmt.Print(message)
+	var input string
+	fmt.Scanln(&input)
+	return strings.TrimSpace(input)
 }
