@@ -35,7 +35,16 @@ func main() {
 		case "1":
 			getWordlistContent(db)
 		case "2":
-			searchWordlist(db, "local")
+			common.PrintInfo("Default wordlist source is local file")
+			typeWordList := common.GetInput("Choose wordlist source (local/db): ")
+			if typeWordList != "db" && typeWordList != "local" {
+				typeWordList = "local"
+			} else {
+				common.PrintError("Invalid input")
+				return
+			}
+
+			searchWordlist(db, typeWordList)
 		case "3":
 			common.PrintInfo("Thank you for using this program. See you soon!")
 			return
@@ -77,9 +86,27 @@ func searchWordlist(db *sqlx.DB, typeWordList string) {
 
 	common.PrintInfo("Read %d words from file", len(words))
 
+	withProxy := common.GetInput("Do you want to use proxy? (y/n): ")
+	var optionProxy string
+	if withProxy == "n" {
+		optionProxy = ""
+	} else if withProxy != "y" {
+		common.PrintInfo("Default proxy is residential")
+		chooseProxy := common.GetInput("Choose proxy (residential/datacenter): ")
+		if chooseProxy == "" {
+			chooseProxy = "residential"
+		} else if chooseProxy != "residential" && chooseProxy != "datacenter" {
+			common.PrintError("Invalid proxy type")
+			return
+		}
+		optionProxy = chooseProxy
+	} else {
+		common.PrintError("Invalid input")
+		return
+	}
+
 	batchSize := 100
 	concurrency := 10
-	optionProxy := "residential"
 
 	start := time.Now()
 	lema.ProcessBatch(words, batchSize, concurrency, db, &optionProxy)
@@ -89,12 +116,18 @@ func searchWordlist(db *sqlx.DB, typeWordList string) {
 }
 
 func getWordlistContent(db *sqlx.DB) {
-	username := common.GetInput("Enter your KBBI username: ")
+	email := common.GetInput("Enter your KBBI email: ")
 	password := common.GetInput("Enter your KBBI password: ")
 
-	err := kata.GetWordList(db, username, password)
+	concurrency := 10
+
+	start := time.Now()
+	err := kata.GetWordList(db, email, password, concurrency)
 	if err != nil {
 		common.PrintError("Error getting wordlist: %v", err)
 		return
 	}
+	duration := time.Since(start)
+
+	common.PrintInfo("Total execution time: %v", duration)
 }

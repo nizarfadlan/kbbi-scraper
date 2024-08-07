@@ -59,7 +59,7 @@ func GetProxyList() []string {
 	return proxyList
 }
 
-func GetProxyEndpoint(urlKbbi string) (*string, error) {
+func GetProxyDataCenter(urlKbbi string) (*string, error) {
 	u, errUrlParse := url.Parse(SCRAPEOPS_PROXY_ENDPOINT)
 	if errUrlParse != nil {
 		return nil, fmt.Errorf("failed to parse url: %w", errUrlParse)

@@ -1,14 +1,16 @@
 package kata
 
 import (
+	"fmt"
 	"kbbi-scraper/internal/common"
 	"kbbi-scraper/internal/kbbi"
+	"sync"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/jmoiron/sqlx"
 )
 
-func GetWordList(db *sqlx.DB, email string, password string) error {
+func GetWordList(db *sqlx.DB, email string, password string, concurrency int) error {
 	c := colly.NewCollector(
 		colly.AllowURLRevisit(),
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
@@ -20,27 +22,68 @@ func GetWordList(db *sqlx.DB, email string, password string) error {
 	}
 
 	progress := common.LoadProgress()
-
 	startLetter := 'A'
+
 	if progress.CurrentLetter != "" {
 		startLetter = rune(progress.CurrentLetter[0])
 	}
 
-	for letter := startLetter; letter <= 'Z'; letter++ {
-		startPage := 1
-		if string(letter) == progress.CurrentLetter {
-			startPage = progress.CurrentPage
-		}
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, concurrency)
+	errChan := make(chan error, 26)
 
-		err = kbbi.GetWordListByAlphabet(db, c, string(letter), startPage)
+	for letter := startLetter; letter <= 'Z'; letter++ {
+		wg.Add(1)
+		go func(letter rune) {
+			defer wg.Done()
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			startPage := 1
+			if string(letter) == progress.CurrentLetter {
+				startPage = progress.CurrentPage
+			}
+
+			err := processLetter(db, c.Clone(), letter, startPage)
+			if err != nil {
+				errChan <- fmt.Errorf("error processing letter %c: %v", letter, err)
+			}
+		}(letter)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	for err := range errChan {
 		if err != nil {
-			common.PrintError("Error scraping words for letter %c: %v", letter, err)
+			common.PrintError("%v", err)
+		}
+	}
+
+	return nil
+}
+
+func processLetter(db *sqlx.DB, c *colly.Collector, letter rune, startPage int) error {
+	currentPage := startPage
+
+	for {
+		isLastPage, err := kbbi.GetWordListByAlphabet(db, c, string(letter), currentPage)
+		if err != nil {
+			common.PrintError("Error scraping words for letter %c, page %d: %v", letter, currentPage, err)
 			common.SaveProgress(common.Progress{
 				CurrentLetter: string(letter),
-				CurrentPage:   startPage,
+				CurrentPage:   currentPage,
 			})
-			continue
+			return err
 		}
+
+		if isLastPage {
+			break
+		}
+
+		currentPage++
 	}
 
 	return nil

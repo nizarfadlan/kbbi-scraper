@@ -91,9 +91,9 @@ func ProcessBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, o
 					}
 
 					if len(results) == 0 {
-						message := fmt.Sprintf("No results found for '%s'\n", word)
+						message := fmt.Sprintf("No results found for '%s': %s\n", word, fmt.Append([]byte(kbbi.KBBI_URL), word))
 						common.PrintInfo(message)
-						common.LogError(message, nil)
+						common.LogInfo(message)
 						return
 					}
 

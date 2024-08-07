@@ -106,11 +106,11 @@ func LoginKBBI(c *colly.Collector, email, password string) error {
 	return loginErr
 }
 
-func GetWordListByAlphabet(db *sqlx.DB, c *colly.Collector, letter string, startPage int) error {
+func GetWordListByAlphabet(db *sqlx.DB, c *colly.Collector, letter string, startPage int) (bool, error) {
 	var globalErr error
 	baseURL, err := url.Parse(KBBI_WORDLIST_URL)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	params := url.Values{}
@@ -123,11 +123,14 @@ func GetWordListByAlphabet(db *sqlx.DB, c *colly.Collector, letter string, start
 	var totalPages int
 	var words []string
 	currentPage := startPage
+	isLastPage := false
 
 	c.OnHTML("#currentPageId", func(e *colly.HTMLElement) {
 		parts := strings.Split(e.Text, "/")
 		if len(parts) == 2 {
 			totalPages, _ = strconv.Atoi(strings.TrimSpace(parts[1]))
+			currentPage, _ = strconv.Atoi(strings.TrimSpace(parts[0]))
+			isLastPage = currentPage == totalPages
 		}
 	})
 
@@ -140,9 +143,6 @@ func GetWordListByAlphabet(db *sqlx.DB, c *colly.Collector, letter string, start
 	})
 
 	c.OnHTML(".row", func(e *colly.HTMLElement) {
-		if currentPage >= totalPages {
-			return
-		}
 		nextPage := e.ChildAttr("a[title='Ke halaman berikutnya']", "href")
 		if nextPage != "" {
 			currentPage++
@@ -153,12 +153,14 @@ func GetWordListByAlphabet(db *sqlx.DB, c *colly.Collector, letter string, start
 				CurrentPage:   currentPage,
 			})
 			e.Request.Visit(nextURL)
+		} else {
+			isLastPage = true
 		}
 	})
 
 	err = c.Visit(baseURL.String())
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	c.OnScraped(func(r *colly.Response) {
@@ -167,10 +169,10 @@ func GetWordListByAlphabet(db *sqlx.DB, c *colly.Collector, letter string, start
 	})
 
 	if globalErr != nil {
-		return globalErr
+		return isLastPage, globalErr
 	}
 
-	return nil
+	return isLastPage, nil
 }
 
 func SearchWord(word string, optionProxy *string) ([]ResponseSearch, error) {
@@ -184,7 +186,7 @@ func SearchWord(word string, optionProxy *string) ([]ResponseSearch, error) {
 	)
 
 	setHeaders(c)
-	c.SetRequestTimeout(time.Second * 40)
+	c.SetRequestTimeout(time.Second * 60)
 
 	c.OnHTML(".body-content", func(e *colly.HTMLElement) {
 		e.DOM.Find("h4:contains('Pesan')").NextAll().Remove()
@@ -273,8 +275,8 @@ func setProxy(c *colly.Collector, word string, optionProxy *string) (*string, er
 			}
 
 			c.SetProxyFunc(rp)
-		} else if typeProxy == "endpoint" {
-			pu, err := common.GetProxyEndpoint(urlKbbi)
+		} else if typeProxy == "datacenter" {
+			pu, err := common.GetProxyDataCenter(urlKbbi)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get proxy endpoint: %w", err)
 			}
