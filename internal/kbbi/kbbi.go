@@ -75,6 +75,18 @@ func parseArti(s *goquery.Selection) []Arti {
 	return artiList
 }
 
+// func parseArtiType2(s *goquery.Selection) []Arti {
+// 	var artiList []Arti
+// 	s.Find("li").Each(func(_ int, li *goquery.Selection) {
+// 		arti := Arti{
+// 			KelasKata:  li.Find("span").Text(),
+// 			Keterangan: parseKeterangan(li),
+// 		}
+// 		artiList = append(artiList, arti)
+// 	})
+// 	return artiList
+// }
+
 func LoginKBBI(c *colly.Collector, email, password string) error {
 	var loginErr error
 	var token string
@@ -93,10 +105,10 @@ func LoginKBBI(c *colly.Collector, email, password string) error {
 	}
 
 	err = c.Post(KBBI_LOGIN_URL, map[string]string{
+		"__RequestVerificationToken": token,
 		"Posel":                      email,
 		"KataSandi":                  password,
-		"__RequestVerificationToken": token,
-		"IngatSaya":                  "true",
+		"IngatSaya":                  "false",
 	})
 
 	if err != nil {
@@ -117,8 +129,9 @@ func GetWordListByAlphabet(db *sqlx.DB, c *colly.Collector, letter string, start
 	params.Add("masukan", letter)
 	params.Add("masukanLengkap", letter)
 	params.Add("page", strconv.Itoa(startPage))
-
 	baseURL.RawQuery = params.Encode()
+
+	fmt.Println(baseURL.String())
 
 	var totalPages int
 	var words []string

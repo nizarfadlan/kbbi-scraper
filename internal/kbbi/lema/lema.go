@@ -49,6 +49,30 @@ func saveToDatabase(db *sqlx.DB, results []kbbi.ResponseSearch, searchedWord str
 	return database.InsertLemas(db, lemas)
 }
 
+// func GetContentWords(
+// 	words []string,
+// 	email string,
+// 	password string,
+// 	batchSize int,
+// 	concurrency int,
+// 	db *sqlx.DB,
+// 	optionProxy *string,
+// ) error {
+// 	c := colly.NewCollector(
+// 		colly.AllowURLRevisit(),
+// 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
+// 	)
+
+// 	err := kbbi.LoginKBBI(c, email, password)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	ProcessBatch(words, batchSize, concurrency, db, optionProxy)
+
+// 	return nil
+// }
+
 func ProcessBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, optionProxy *string) {
 	total := len(words)
 	processed := 0
@@ -70,49 +94,9 @@ func ProcessBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, o
 				go func(word string) {
 					defer func() { <-semaphore }()
 
-					checkExist, errCheck := database.ExistsLemaByKata(db, word)
-					if errCheck != nil {
-						common.PrintError("An error occurred when checking in the database\n")
-						return
-					}
-
-					if checkExist {
-						common.PrintInfo("Word '%s' data in the database already exists\n", word)
-						return
-					}
-
-					common.PrintInfo("Processing '%s'", word)
-					results, err := kbbi.SearchWord(word, optionProxy)
+					err := processWord(word, db, optionProxy)
 					if err != nil {
-						message := fmt.Sprintf("Error searching for '%s'\n", word)
-						common.PrintError("%s: %v", message, err)
-						common.LogError(message, err)
-						return
-					}
-
-					if len(results) == 0 {
-						message := fmt.Sprintf("No results found for '%s': %s\n", word, fmt.Append([]byte(kbbi.KBBI_URL), word))
-						common.PrintInfo(message)
-						common.LogInfo(message)
-						return
-					}
-
-					errInsert := saveToDatabase(db, results, word)
-					if errInsert != nil {
-						message := fmt.Sprintf("Error inserting '%s'\n", word)
-						common.PrintError("%s: %v", message, errInsert)
-						common.LogError(message, errInsert)
-						return
-					}
-
-					common.PrintSuccess("Successfully processed word '%s'", word)
-					for _, result := range results {
-						common.PrintSuccess("Lema: %s\n", result.Lema)
-						for _, arti := range result.Arti {
-							common.PrintSuccess("  Kelas Kata: %s\n", arti.KelasKata)
-							common.PrintSuccess("  Keterangan: %s\n", arti.Keterangan)
-						}
-						fmt.Println()
+						common.PrintError("Error processing word '%s': %v", word, err)
 					}
 				}(word)
 			}
@@ -124,4 +108,50 @@ func ProcessBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, o
 	}
 
 	wg.Wait()
+}
+
+func processWord(word string, db *sqlx.DB, optionProxy *string) error {
+	checkExist, errCheck := database.ExistsLemaByKata(db, word)
+	if errCheck != nil {
+		return fmt.Errorf("error checking in the database: %w", errCheck)
+	}
+
+	if checkExist {
+		common.PrintInfo("word '%s' data in the database already exists", word)
+		return nil
+	}
+
+	common.PrintInfo("Processing '%s'", word)
+	results, err := kbbi.SearchWord(word, optionProxy)
+	if err != nil {
+		message := fmt.Sprintf("Error searching for '%s'\n", word)
+		common.LogError(message, err)
+		return fmt.Errorf("searching for '%s': %w", word, err)
+	}
+
+	if len(results) == 0 {
+		message := fmt.Sprintf("No results found for '%s': %s\n", word, fmt.Append([]byte(kbbi.KBBI_URL), word))
+		common.PrintWarning(message)
+		common.LogInfo(message)
+		return nil
+	}
+
+	errInsert := saveToDatabase(db, results, word)
+	if errInsert != nil {
+		message := fmt.Sprintf("error inserting '%s'\n", word)
+		common.LogError(message, errInsert)
+		return fmt.Errorf("error inserting '%s': %w", word, errInsert)
+	}
+
+	common.PrintSuccess("Successfully processed word '%s'", word)
+	for _, result := range results {
+		common.PrintSuccess("Lema: %s\n", result.Lema)
+		for _, arti := range result.Arti {
+			common.PrintSuccess("  Kelas Kata: %s\n", arti.KelasKata)
+			common.PrintSuccess("  Keterangan: %s\n", arti.Keterangan)
+		}
+		fmt.Println()
+	}
+
+	return nil
 }

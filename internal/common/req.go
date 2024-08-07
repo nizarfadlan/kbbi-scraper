@@ -19,8 +19,6 @@ const (
 	SCRAPEOPS_PROXY_ENDPOINT        = "https://proxy.scrapeops.io/v1/"
 )
 
-var scrapeopsAPIKey = os.Getenv("SCRAPE_OPS")
-
 func RandomHeader(headersList []map[string]string) map[string]string {
 	if len(headersList) == 0 {
 		return map[string]string{}
@@ -31,7 +29,8 @@ func RandomHeader(headersList []map[string]string) map[string]string {
 }
 
 func GetHeadersList() []map[string]string {
-	scrapeopsAPIEndpoint := SCRAPEOPS_FAKE_BROWSER_ENDPOINT + scrapeopsAPIKey
+	scrapeopsAPIKey := os.Getenv("SCRAPE_OPS")
+	scrapeopsAPIEndpoint := fmt.Sprintf("%s%s", SCRAPEOPS_FAKE_BROWSER_ENDPOINT, scrapeopsAPIKey)
 
 	req, _ := http.NewRequest("GET", scrapeopsAPIEndpoint, nil)
 	client := &http.Client{
@@ -39,7 +38,7 @@ func GetHeadersList() []map[string]string {
 	}
 
 	resp, err := client.Do(req)
-	if err == nil && resp.StatusCode == 200 {
+	if err == nil {
 		defer resp.Body.Close()
 
 		var fakeBrowserHeadersResponse FakeBrowserHeadersResponse
@@ -52,6 +51,7 @@ func GetHeadersList() []map[string]string {
 }
 
 func GetProxyList() []string {
+	scrapeopsAPIKey := os.Getenv("SCRAPE_OPS")
 	proxyList := []string{
 		fmt.Sprintf("http://scrapeops:%s@residential-proxy.scrapeops.io:8181", scrapeopsAPIKey),
 	}
@@ -60,6 +60,7 @@ func GetProxyList() []string {
 }
 
 func GetProxyDataCenter(urlKbbi string) (*string, error) {
+	scrapeopsAPIKey := os.Getenv("SCRAPE_OPS")
 	u, errUrlParse := url.Parse(SCRAPEOPS_PROXY_ENDPOINT)
 	if errUrlParse != nil {
 		return nil, fmt.Errorf("failed to parse url: %w", errUrlParse)

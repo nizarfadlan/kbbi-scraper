@@ -27,6 +27,10 @@ func main() {
 	}
 	defer database.CloseDB(db)
 
+	// TODO: Save email and password to login.json file
+	// email := common.GetInput("Enter your KBBI email: ")
+	// password := common.GetInput("Enter your KBBI password: ")
+
 	for {
 		common.DisplayMenu()
 		choice := common.GetUserChoice()
@@ -39,9 +43,6 @@ func main() {
 			typeWordList := common.GetInput("Choose wordlist source (local/db): ")
 			if typeWordList != "db" && typeWordList != "local" {
 				typeWordList = "local"
-			} else {
-				common.PrintError("Invalid input")
-				return
 			}
 
 			searchWordlist(db, typeWordList)
@@ -90,14 +91,11 @@ func searchWordlist(db *sqlx.DB, typeWordList string) {
 	var optionProxy string
 	if withProxy == "n" {
 		optionProxy = ""
-	} else if withProxy != "y" {
+	} else if withProxy == "y" {
 		common.PrintInfo("Default proxy is residential")
 		chooseProxy := common.GetInput("Choose proxy (residential/datacenter): ")
-		if chooseProxy == "" {
+		if chooseProxy != "residential" && chooseProxy != "datacenter" {
 			chooseProxy = "residential"
-		} else if chooseProxy != "residential" && chooseProxy != "datacenter" {
-			common.PrintError("Invalid proxy type")
-			return
 		}
 		optionProxy = chooseProxy
 	} else {

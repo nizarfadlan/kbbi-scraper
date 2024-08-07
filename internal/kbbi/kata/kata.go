@@ -71,7 +71,6 @@ func processLetter(db *sqlx.DB, c *colly.Collector, letter rune, startPage int) 
 	for {
 		isLastPage, err := kbbi.GetWordListByAlphabet(db, c, string(letter), currentPage)
 		if err != nil {
-			common.PrintError("Error scraping words for letter %c, page %d: %v", letter, currentPage, err)
 			common.SaveProgress(common.Progress{
 				CurrentLetter: string(letter),
 				CurrentPage:   currentPage,

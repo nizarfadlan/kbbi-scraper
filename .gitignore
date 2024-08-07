@@ -1,3 +1,5 @@
 error.log
 info.log
 .env
+scrape_progress.json
+login.json
