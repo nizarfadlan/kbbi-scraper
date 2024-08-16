@@ -1,3 +1,20 @@
+/*
+ *  Copyright (c) 2024 Nizar Izzuddin Yatim Fadlan <hello@nizarfadlan.dev>
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package common
 
 import (
@@ -14,10 +31,14 @@ type FakeBrowserHeadersResponse struct {
 	Result []map[string]string `json:"result"`
 }
 
-const (
-	SCRAPEOPS_FAKE_BROWSER_ENDPOINT = "http://headers.scrapeops.io/v1/browser-headers?api_key="
-	SCRAPEOPS_PROXY_ENDPOINT        = "https://proxy.scrapeops.io/v1/"
-)
+const SCRAPEOPS_FAKE_BROWSER_ENDPOINT = "http://headers.scrapeops.io/v1/browser-headers?api_key="
+
+var proxyEndpoints = map[string]string{
+	"scrapeops":   "https://proxy.scrapeops.io/v1/",
+	"scrapingant": "https://api.scrapingant.com/v2/general",
+	"scraperapi":  "http://api.scraperapi.com",
+	"scrapingbee": "https://app.scrapingbee.com/api/v1/",
+}
 
 func RandomHeader(headersList []map[string]string) map[string]string {
 	if len(headersList) == 0 {
@@ -36,6 +57,7 @@ func GetHeadersList() []map[string]string {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
+	req.Close = true
 
 	resp, err := client.Do(req)
 	if err == nil {
@@ -50,27 +72,43 @@ func GetHeadersList() []map[string]string {
 	return emptySlice
 }
 
-func GetProxyList() []string {
+func GetProxyResidential() []string {
 	scrapeopsAPIKey := os.Getenv("SCRAPE_OPS")
 	proxyList := []string{
-		fmt.Sprintf("http://scrapeops:%s@residential-proxy.scrapeops.io:8181", scrapeopsAPIKey),
+		fmt.Sprintf("http://scrapeops.country=jp:%s@residential-proxy.scrapeops.io:8181", scrapeopsAPIKey),
 	}
 
 	return proxyList
 }
 
-func GetProxyDataCenter(urlKbbi string) (*string, error) {
-	scrapeopsAPIKey := os.Getenv("SCRAPE_OPS")
-	u, errUrlParse := url.Parse(SCRAPEOPS_PROXY_ENDPOINT)
-	if errUrlParse != nil {
-		return nil, fmt.Errorf("failed to parse url: %w", errUrlParse)
+func GetProxyDataCenter(urlKbbi, providerProxy string) (string, error) {
+	endpoint, ok := proxyEndpoints[providerProxy]
+	if !ok {
+		return "", fmt.Errorf("unknown provider: %s", providerProxy)
 	}
 
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse url: %w", err)
+	}
 	q := u.Query()
-	q.Set("api_key", scrapeopsAPIKey)
 	q.Set("url", urlKbbi)
-	u.RawQuery = q.Encode()
-	url := u.String()
 
-	return &url, nil
+	switch providerProxy {
+	case "scrapeops":
+		q.Set("country", "jp")
+		q.Set("api_key", os.Getenv("SCRAPE_OPS"))
+	case "scrapingant":
+		q.Set("browser", "false")
+		q.Set("proxy_country", "ID")
+		q.Set("x-api-key", os.Getenv("SCRAPING_ANT"))
+	case "scraperapi":
+		q.Set("api_key", os.Getenv("SCRAPER_API"))
+	case "scrapingbee":
+		q.Set("render_js", "false")
+		q.Set("api_key", os.Getenv("SCRAPING_BEE"))
+	}
+
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }

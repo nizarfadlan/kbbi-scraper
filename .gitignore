@@ -3,3 +3,5 @@ info.log
 .env
 scrape_progress.json
 login.json
+no_result_word.json
+kbbi-scraper.exe

@@ -1,8 +1,27 @@
+/*
+ *  Copyright (c) 2024 Nizar Izzuddin Yatim Fadlan <hello@nizarfadlan.dev>
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package lema
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 
@@ -13,6 +32,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/jmoiron/sqlx"
 )
+
+const NORESULT_FILE = "no_result_word.json"
+
+type NoResult struct {
+	Word string `json:"word"`
+	Url  string `json:"url"`
+}
 
 func ReadWordsFromFile(filename string) ([]string, error) {
 	file, err := os.Open(filename)
@@ -49,31 +75,7 @@ func saveToDatabase(db *sqlx.DB, results []kbbi.ResponseSearch, searchedWord str
 	return database.InsertLemas(db, lemas)
 }
 
-// func GetContentWords(
-// 	words []string,
-// 	email string,
-// 	password string,
-// 	batchSize int,
-// 	concurrency int,
-// 	db *sqlx.DB,
-// 	optionProxy *string,
-// ) error {
-// 	c := colly.NewCollector(
-// 		colly.AllowURLRevisit(),
-// 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
-// 	)
-
-// 	err := kbbi.LoginKBBI(c, email, password)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	ProcessBatch(words, batchSize, concurrency, db, optionProxy)
-
-// 	return nil
-// }
-
-func ProcessBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, optionProxy *string) {
+func ProcessBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, optionProxy string, providerProxy string) {
 	total := len(words)
 	processed := 0
 	var wg sync.WaitGroup
@@ -94,7 +96,7 @@ func ProcessBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, o
 				go func(word string) {
 					defer func() { <-semaphore }()
 
-					err := processWord(word, db, optionProxy)
+					err := processWord(word, db, optionProxy, providerProxy)
 					if err != nil {
 						common.PrintError("Error processing word '%s': %v", word, err)
 					}
@@ -110,7 +112,7 @@ func ProcessBatch(words []string, batchSize int, concurrency int, db *sqlx.DB, o
 	wg.Wait()
 }
 
-func processWord(word string, db *sqlx.DB, optionProxy *string) error {
+func processWord(word string, db *sqlx.DB, optionProxy string, providerProxy string) error {
 	checkExist, errCheck := database.ExistsLemaByKata(db, word)
 	if errCheck != nil {
 		return fmt.Errorf("error checking in the database: %w", errCheck)
@@ -121,8 +123,13 @@ func processWord(word string, db *sqlx.DB, optionProxy *string) error {
 		return nil
 	}
 
+	if checkWordOnNoResults(word) {
+		common.PrintWarning("The word '%s' is in the list of files with no results", word)
+		return nil
+	}
+
 	common.PrintInfo("Processing '%s'", word)
-	results, err := kbbi.SearchWord(word, optionProxy)
+	results, err := kbbi.SearchWord(word, optionProxy, providerProxy)
 	if err != nil {
 		message := fmt.Sprintf("Error searching for '%s'\n", word)
 		common.LogError(message, err)
@@ -130,9 +137,14 @@ func processWord(word string, db *sqlx.DB, optionProxy *string) error {
 	}
 
 	if len(results) == 0 {
-		message := fmt.Sprintf("No results found for '%s': %s\n", word, fmt.Append([]byte(kbbi.KBBI_URL), word))
-		common.PrintWarning(message)
+		url := fmt.Append([]byte(kbbi.KBBI_URL), word)
+		message := fmt.Sprintf("[NO RESULT] No results found for '%s': %s\n", word, url)
+		common.PrintError(message)
 		common.LogInfo(message)
+		addNoResult(NoResult{
+			Word: word,
+			Url:  string(url),
+		})
 		return nil
 	}
 
@@ -143,15 +155,73 @@ func processWord(word string, db *sqlx.DB, optionProxy *string) error {
 		return fmt.Errorf("error inserting '%s': %w", word, errInsert)
 	}
 
+	common.PrintCustom("========================================", color.FgGreen, true)
 	common.PrintSuccess("Successfully processed word '%s'", word)
-	for _, result := range results {
-		common.PrintSuccess("Lema: %s\n", result.Lema)
-		for _, arti := range result.Arti {
-			common.PrintSuccess("  Kelas Kata: %s\n", arti.KelasKata)
-			common.PrintSuccess("  Keterangan: %s\n", arti.Keterangan)
+	for iLema, result := range results {
+		common.PrintCustom("Lema: %s", color.FgMagenta, true, result.Lema)
+		for iArti, arti := range result.Arti {
+			fmt.Printf("  Arti %d\n", iArti+1)
+			common.PrintCustom("  Kelas Kata: %s", color.FgMagenta, true, arti.KelasKata)
+			common.PrintCustom("  Keterangan: %s", color.FgMagenta, true, arti.Keterangan)
+			if iArti < len(result.Arti)-1 {
+				common.PrintCustom("  ========================================", color.FgMagenta, true)
+			}
 		}
-		fmt.Println()
+
+		if iLema < len(results)-1 {
+			common.PrintCustom("========================================", color.FgYellow, true)
+		}
 	}
+	common.PrintCustom("========================================", color.FgGreen, true)
 
 	return nil
+}
+
+func saveNoResults(results []NoResult) {
+	data, err := json.Marshal(results)
+	if err != nil {
+		log.Printf("Error marshaling noresults: %v", err)
+		return
+	}
+
+	err = os.WriteFile(NORESULT_FILE, data, 0644)
+	if err != nil {
+		log.Printf("Error saving noresults: %v", err)
+	}
+}
+
+func loadNoResults() []NoResult {
+	data, err := os.ReadFile(NORESULT_FILE)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []NoResult{}
+		}
+		log.Printf("Error reading noresults file: %v", err)
+		return []NoResult{}
+	}
+
+	var results []NoResult
+	err = json.Unmarshal(data, &results)
+	if err != nil {
+		log.Printf("Error unmarshaling noresults: %v", err)
+		return []NoResult{}
+	}
+
+	return results
+}
+
+func checkWordOnNoResults(word string) bool {
+	results := loadNoResults()
+	for _, result := range results {
+		if result.Word == word {
+			return true
+		}
+	}
+	return false
+}
+
+func addNoResult(newResult NoResult) {
+	results := loadNoResults()
+	results = append(results, newResult)
+	saveNoResults(results)
 }

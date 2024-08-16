@@ -1,3 +1,20 @@
+/*
+ *  Copyright (c) 2024 Nizar Izzuddin Yatim Fadlan <hello@nizarfadlan.dev>
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package kata
 
 import (
@@ -16,7 +33,7 @@ func GetWordList(db *sqlx.DB, email string, password string, concurrency int) er
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
 	)
 
-	err := kbbi.LoginKBBI(c, email, password)
+	_, err := kbbi.LoginKBBI(email, password)
 	if err != nil {
 		return err
 	}
@@ -44,7 +61,7 @@ func GetWordList(db *sqlx.DB, email string, password string, concurrency int) er
 				startPage = progress.CurrentPage
 			}
 
-			err := processLetter(db, c.Clone(), letter, startPage)
+			err := processLetter(c.Clone(), db, letter, startPage)
 			if err != nil {
 				errChan <- fmt.Errorf("error processing letter %c: %v", letter, err)
 			}
@@ -65,11 +82,11 @@ func GetWordList(db *sqlx.DB, email string, password string, concurrency int) er
 	return nil
 }
 
-func processLetter(db *sqlx.DB, c *colly.Collector, letter rune, startPage int) error {
+func processLetter(c *colly.Collector, db *sqlx.DB, letter rune, startPage int) error {
 	currentPage := startPage
 
 	for {
-		isLastPage, err := kbbi.GetWordListByAlphabet(db, c, string(letter), currentPage)
+		isLastPage, err := kbbi.GetWordListByAlphabet(c, db, string(letter), currentPage)
 		if err != nil {
 			common.SaveProgress(common.Progress{
 				CurrentLetter: string(letter),

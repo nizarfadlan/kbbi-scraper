@@ -1,3 +1,20 @@
+/*
+ *  Copyright (c) 2024 Nizar Izzuddin Yatim Fadlan <hello@nizarfadlan.dev>
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package common
 
 import (
@@ -75,7 +92,7 @@ func PrintCustom(format string, textColor color.Attribute, isBold bool, a ...int
 
 func DisplayMenu() {
 	PrintCustom("=== Menu Wordlist ===", color.FgHiMagenta, true)
-	PrintCustom("1. Find Wordlist", color.FgHiMagenta, true)
+	PrintCustom("1. Find Wordlist (Alpha)", color.FgHiMagenta, true)
 	PrintCustom("2. Fetch Wordlist Contents", color.FgHiMagenta, true)
 	PrintCustom("3. Quit", color.FgHiMagenta, true)
 	fmt.Print("Choose an option (1-3): ")

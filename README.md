@@ -4,7 +4,19 @@ Scraper KBBI 5 pada website [kbbi.kemdikbud](https://kbbi.kemdikbud.go.id/) deng
 # Run
 
 ```bash
-go run ./cmd/cli
+go run main.go
+```
+
+Atau build terlebih dahulu
+
+```bash
+go build
+
+./kbbi-scraper
+
+# or
+
+kbbi-scraper.exe
 ```
 
 # Example data
@@ -25,6 +37,9 @@ Dalam penyimpanan data 1 kata bisa lebih dari 1 lema dan 1 lema bisa lebih dari 
 |1288|aku       |A.ku         |n[Nomina: kata benda]                                 |Li'o                                                                                                   |
 |...|...       |...          |...                                                   |...                                                                                                    |
 
+# Note
+
+Kekurangan masih belum bisa mengembail kata prakategorial (contoh: https://kbbi.kemdikbud.go.id/entri/repuh), jika menemukan kata prakategorial akan dianggap tidak ada hasil yang nantinya masuk ke file `no_result_word.json`
 
 # Source
 
